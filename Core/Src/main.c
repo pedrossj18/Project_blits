@@ -3,8 +3,8 @@
 
 // Definições de constantes
 #define menu_max 5  // Número máximo de opções no menu
-#define min_value 1900  // Valor mínimo
-#define max_value 2099  // Valor máximo
+#define min_value 1980  // Valor mínimo
+#define max_value 2060  // Valor máximo
 #define initial_value 2010  // Valor inicial ao entrar no menu
 
 // Função de protótipos
@@ -13,18 +13,18 @@ void keyboard();
 void menu1();
 void menu2();
 void menu3();
-void menu4();
-void menuValores();
+void contato();
+void parametrizacao();
 
 // Variáveis globais
-int menu_num = 1;
-int sub_menu = 1;
+int menu_num = 1;  // Opção atual do menu
+int sub_menu = 1;  // Indica se está no menu principal ou em um submenu
 int current_value = initial_value;  // Valor inicial para o menu de valores
 
-uint8_t button_dir = 0;
-uint8_t button_esq = 0;
-uint8_t button_cima = 0;
-uint8_t button_baixo = 0;
+uint8_t button_confirm = 0;
+uint8_t button_right = 0;
+uint8_t button_up = 0;
+uint8_t button_down = 0;
 
 // Inicialização do LCD
 LiquidCrystal lcd;
@@ -48,42 +48,25 @@ int main(void)
     while (1)
     {
         // Leituras dos Botões
-        button_dir = HAL_GPIO_ReadPin(BT_DIR_GPIO_Port, BT_DIR_Pin);   // Botão direito
-        button_esq = HAL_GPIO_ReadPin(BT_ESQ_GPIO_Port, BT_ESQ_Pin);   // Botão esquerdo
-        button_cima = HAL_GPIO_ReadPin(BT_CIMA_GPIO_Port, BT_CIMA_Pin); // Botão cima
-        button_baixo = HAL_GPIO_ReadPin(BT_BAIXO_GPIO_Port, BT_BAIXO_Pin); // Botão baixo
+        button_confirm = HAL_GPIO_ReadPin(BT_ESQ_GPIO_Port, BT_ESQ_Pin);   // Botão de confirmação (esquerda)
+        button_right = HAL_GPIO_ReadPin(BT_DIR_GPIO_Port, BT_DIR_Pin);   // Botão de navegação (direita)
+        button_up = HAL_GPIO_ReadPin(BT_CIMA_GPIO_Port, BT_CIMA_Pin);   // Botão para aumentar
+        button_down = HAL_GPIO_ReadPin(BT_BAIXO_GPIO_Port, BT_BAIXO_Pin);   // Botão para diminuir
 
-        // Verifica se exatamente um botão está pressionado.
-        // A condição checa se apenas um dos quatro botões (direita, esquerda, cima ou baixo) está pressionado,
-        // enquanto os outros três botões não estão pressionados.
-        if ((button_dir == GPIO_PIN_SET && button_esq != GPIO_PIN_SET && button_cima != GPIO_PIN_SET && button_baixo != GPIO_PIN_SET) ||
-            (button_esq == GPIO_PIN_SET && button_dir != GPIO_PIN_SET && button_cima != GPIO_PIN_SET && button_baixo != GPIO_PIN_SET) ||
-            (button_cima == GPIO_PIN_SET && button_esq != GPIO_PIN_SET && button_dir != GPIO_PIN_SET && button_baixo != GPIO_PIN_SET) ||
-            (button_baixo == GPIO_PIN_SET && button_esq != GPIO_PIN_SET && button_dir != GPIO_PIN_SET && button_cima != GPIO_PIN_SET))
-        {
-            // Acende o LED vermelho se apenas um dos botões estiver pressionado
-            HAL_GPIO_WritePin(LED_VERMELHO_GPIO_Port, LED_VERMELHO_Pin, GPIO_PIN_SET);  // Acende o LED
-        }
-        else
-        {
-            // Apaga o LED vermelho se nenhum ou mais de um botão estiver pressionado
-            HAL_GPIO_WritePin(LED_VERMELHO_GPIO_Port, LED_VERMELHO_Pin, GPIO_PIN_RESET);  // Apaga o LED
-        }
-        keyboard();  // Leitura dos botões
+        // Controle do menu e navegação
+        keyboard();  // Leitura dos botões e navegação
 
-        // Controle do menu
+        // Controle do menu atual
         switch (menu_num)
         {
             case 1: menu1(); break;
             case 2: menu2(); break;
             case 3: menu3(); break;
-            case 4: menu4(); break;
-            case 5: menuValores(); break;// Menu para os valores de 1980 a 2060
+            case 4: contato(); break;
+            case 5: parametrizacao(); break; // Menu para os valores de 1980 a 2060
         }
     }
 }
-// Fim da função "main"
-// Função de leitura dos botões e navegação
 
 // Função para exibir a apresentação ao ligar
 void apresentacao()
@@ -94,81 +77,58 @@ void apresentacao()
     setCursor(&lcd, 0, 1);
     print(&lcd, (int8_t *)"    INDFLOW    ");
 
-    HAL_Delay(4000);  // Delay de 5 segundos
+    HAL_Delay(5000);  // Delay de 5 segundos
 
     clear(&lcd);  // Limpa a tela após o delay
 }
 
-//Configuração dos Botões
+// Função de navegação do menu com os botões
 void keyboard()
 {
-    // Botão para aumentar a opção do menu
-    if (HAL_GPIO_ReadPin(BT_CIMA_GPIO_Port, BT_CIMA_Pin) == GPIO_PIN_SET && sub_menu == 1)
+    // Navegação entre as opções de menu com o botão direito
+    if (button_right == GPIO_PIN_SET && sub_menu == 1)  // Quando estiver no menu principal
     {
-        HAL_Delay(150);
-        if (menu_num < menu_max) menu_num += 1;  // Avança para o próximo menu
+        HAL_Delay(50);  // Debounce
+        if (menu_num < menu_max)
+            menu_num += 1;  // Avança para a próxima opção
+        else
+            menu_num = 1;   // Volta para a primeira opção se estiver na última
     }
 
-    // Botão para diminuir a opção do menu
-    if (HAL_GPIO_ReadPin(BT_BAIXO_GPIO_Port, BT_BAIXO_Pin) == GPIO_PIN_SET && sub_menu == 1)
+    // Confirmação com o botão esquerdo (entrar ou sair do submenu)
+    if (button_confirm == GPIO_PIN_SET)
     {
-        HAL_Delay(150);
-        if (menu_num > 1) menu_num -= 1;  // Volta para o menu anterior
+        HAL_Delay(50);  // Debounce
+        if (sub_menu == 1)  // Se estiver no menu principal, entra no submenu
+        {
+            sub_menu = 2;  // Entra no submenu
+        }
+        else if (sub_menu == 2)  // Se estiver no submenu, volta para o menu principal
+        {
+            sub_menu = 1;  // Volta para o menu principal
+        }
     }
 
-    // Botão para entrar na opção selecionada
-    if (HAL_GPIO_ReadPin(BT_DIR_GPIO_Port, BT_DIR_Pin) == GPIO_PIN_SET)
+    // Navegação nos valores com os botões cima e baixo no submenu
+    if (sub_menu == 2 && menu_num == 5)  // Se estiver no submenu de valores
     {
-        HAL_Delay(150);
-        if (sub_menu < 2) sub_menu += 1;  // Entra no submenu
-    }
+        // Aumenta o valor com o botão de cima
+        if (button_up == GPIO_PIN_SET)
+        {
+            HAL_Delay(50);
+            if (current_value < max_value) current_value += 1;
+        }
 
-    // Botão para voltar ao menu anterior
-    if (HAL_GPIO_ReadPin(BT_ESQ_GPIO_Port, BT_ESQ_Pin) == GPIO_PIN_SET)
-    {
-        HAL_Delay(150);
-        if (sub_menu > 1) sub_menu -= 1;  // Volta ao menu principal
+        // Diminui o valor com o botão de baixo
+        if (button_down == GPIO_PIN_SET)
+        {
+            HAL_Delay(50);
+            if (current_value > min_value) current_value -= 1;
+        }
     }
 }
 
 // Funções dos menus
-void menuValores()
-{
-    // Submenu para modificar o valor
-    switch (sub_menu)
-    {
-        case 1:
-            setCursor(&lcd, 0, 0);
-            print(&lcd, (int8_t *)"<PARAMETRIZACAO>");
-            setCursor(&lcd, 0, 1);
-            char buffer[16];
-            snprintf(buffer, sizeof(buffer), "ENTRAR:    %d", current_value);
-            print(&lcd, (int8_t *)buffer);
-            break;
-
-        case 2:
-            // Navegação pelos valores entre 1980 e 2060
-            if (button_cima == GPIO_PIN_SET)
-            {
-                HAL_Delay(20);
-                if (current_value < max_value) current_value += 1;  // Aumenta o valor
-            }
-            if (button_baixo == GPIO_PIN_SET)
-            {
-                HAL_Delay(20);
-                if (current_value > min_value) current_value -= 1;  // Diminui o valor
-            }
-
-            // Atualiza o display com o valor atual
-            setCursor(&lcd, 0, 0);
-            print(&lcd, (int8_t *)" PARAMETRIZACAO ");
-            setCursor(&lcd, 0, 1);
-            snprintf(buffer, sizeof(buffer), "SENHA:     %d", current_value);
-            print(&lcd, (int8_t *)buffer);
-            break;
-    }
-}
-
 void menu1()
 {
     switch (sub_menu)
@@ -226,22 +186,39 @@ void menu3()
     }
 }
 
-void menu4()
-
+void contato()
 {
+    switch (sub_menu)
+    {
+    	case 1:
+			setCursor(&lcd, 0, 0);
+			print(&lcd, (int8_t *)" INF DE CONTATO ");
+			setCursor(&lcd, 0, 1);
+			print(&lcd, (int8_t *)"+55 11 5522-4655 ");
+    }
+}
+
+void parametrizacao()
+{
+    // Submenu para modificar o valor
     switch (sub_menu)
     {
         case 1:
             setCursor(&lcd, 0, 0);
-            print(&lcd, (int8_t *)"<  Wattimetro  >");
+            print(&lcd, (int8_t *)"< PARAMETRIZACAO >");
             setCursor(&lcd, 0, 1);
-            print(&lcd, (int8_t *)"                ");
+            char buffer[16];
+            snprintf(buffer, sizeof(buffer), "SENHA:     %d ", current_value);
+            print(&lcd, (int8_t *)buffer);
             break;
+
         case 2:
+            // Atualiza o display com o valor atual
             setCursor(&lcd, 0, 0);
-            print(&lcd, (int8_t *)"   Wattimetro   ");
+            print(&lcd, (int8_t *)" PARAMETRIZACAO ");
             setCursor(&lcd, 0, 1);
-            print(&lcd, (int8_t *)"    55 Watts    ");
+            snprintf(buffer, sizeof(buffer), "   Ano:    %d   ", current_value);
+            print(&lcd, (int8_t *)buffer);
             break;
     }
 }
